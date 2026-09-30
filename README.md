@@ -1,103 +1,83 @@
-# :package_description
+# Laravel API Concern
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/:vendor_slug/:package_slug.svg?style=flat-square)](https://packagist.org/packages/:vendor_slug/:package_slug)
-[![GitHub Tests Action Status](https://github.com/spatie/package-skeleton-laravel/actions/workflows/run-tests.yml/badge.svg)](https://github.com/:vendor_slug/:package_slug/actions?query=workflow%3Arun-tests+branch%3Amain)
-[![GitHub Code Style Action Status](https://github.com/spatie/package-skeleton-laravel/actions/workflows/fix-php-code-style-issues.yml/badge.svg)](https://github.com/:vendor_slug/:package_slug/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
-[![Total Downloads](https://img.shields.io/packagist/dt/:vendor_slug/:package_slug.svg?style=flat-square)](https://packagist.org/packages/:vendor_slug/:package_slug)
-<!--delete-->
----
-This repo can be used to scaffold a Laravel package. Follow these steps to get started:
-
-1. Press the "Use this template" button at the top of this repo to create a new repo with the contents of this skeleton.
-2. Run "php ./configure.php" to run a script that will replace all placeholders throughout all the files.
-
-   To run it unattended — from a script, or by handing it to a coding agent — pass `--no-interaction`
-   (`-n`) and the answers as options. It never prompts, and exits non-zero with a message naming any
-   option it still needs:
-
-   ```bash
-   php ./configure.php -n --vendor-name="Spatie" --package-name="laravel-ray"
-   ```
-
-   Run "php ./configure.php --help" for the full list of options.
-3. Have fun creating your package.
-4. If you need help creating a package, consider picking up our <a href="https://laravelpackage.training">Laravel Package Training</a> video course.
----
-<!--/delete-->
-This is where your description should go. Limit it to a paragraph or two. Consider adding a small example.
-
-## Support us
-
-[<img src="https://github-ads.s3.eu-central-1.amazonaws.com/:package_name.jpg?t=1" width="419px" />](https://spatie.be/github-ad-click/:package_name)
-
-We invest a lot of resources into creating [best in class open source packages](https://spatie.be/open-source). You can support us by [buying one of our paid products](https://spatie.be/open-source/support-us).
-
-We highly appreciate you sending us a postcard from your hometown, mentioning which of our package(s) you are using. You'll find our address on [our contact page](https://spatie.be/about-us). We publish all received postcards on [our virtual postcard wall](https://spatie.be/open-source/postcards).
+Reusable JSON response helpers and API exception rendering for Laravel 11, 12, and 13.
 
 ## Installation
 
-You can install the package via composer:
-
 ```bash
-composer require :vendor_slug/:package_slug
+composer require curly-deni/laravel-api-concern
 ```
 
-You can publish and run the migrations with:
+Laravel auto-discovers the service provider. It registers the package's English and Russian translations. To customize them, publish the translation files:
 
 ```bash
-php artisan vendor:publish --tag=":package_slug-migrations"
-php artisan migrate
+php artisan vendor:publish --tag=api-concern-translations
 ```
 
-You can publish the config file with:
+Published translations are placed in `lang/vendor/api-concern` and override the package defaults.
 
-```bash
-php artisan vendor:publish --tag=":package_slug-config"
-```
+## Responses
 
-This is the contents of the published config file:
+Use `HasApiResponses` in a controller to return the standard response envelopes:
 
 ```php
-return [
-];
+use Aesis\ApiConcern\Concerns\HasApiResponses;
+use Illuminate\Routing\Controller;
+
+class UserController extends Controller
+{
+    use HasApiResponses;
+
+    public function store()
+    {
+        return $this->created(['id' => 1], ['request_id' => 'abc']);
+    }
+}
 ```
 
-Optionally, you can publish the views using
+Available helpers are `data`, `created`, `accepted`, `noContent`, `resource`, `createdResource`, `acceptedResource`, and `error`. Data responses use a `data` key and include `meta` only when provided. Error responses use an `error` object containing `code`, `message`, and optional `details`.
 
-```bash
-php artisan vendor:publish --tag=":package_slug-views"
-```
+You can also inject `Aesis\ApiConcern\Http\ApiResponseFactory` directly.
 
-## Usage
+## Exception rendering
+
+Add the renderer to the existing `withExceptions` callback in `bootstrap/app.php`. Keep the path check in the application so web exceptions continue through Laravel's normal handling:
 
 ```php
-$:variable = new VendorName\Skeleton();
-echo $:variable->echoPhrase('Hello, VendorName!');
+use Aesis\ApiConcern\Http\ApiExceptionRenderer;
+use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Http\Request;
+use Throwable;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->render(function (Throwable $exception, Request $request) {
+        if (! $request->is('api/v1/*')) {
+            return null;
+        }
+
+        return app(ApiExceptionRenderer::class)->render($exception);
+    });
+})
 ```
+
+For matching requests, the renderer converts validation, authentication, authorization, missing model, throttling, HTTP, and unexpected exceptions to a consistent JSON shape. Throw `Aesis\ApiConcern\Exceptions\ApiException` for an application-specific error:
+
+```php
+throw new ApiException('account_locked', 'This account is locked.', 423, ['retry_after' => 60]);
+```
+
+## Translations
+
+The renderer uses Laravel's `api-concern::messages.*` translation keys. English and Russian defaults are included. Set the application's locale to choose a language, or publish the files and edit them for application-specific wording.
 
 ## Testing
 
 ```bash
 composer test
+composer analyse
+composer format
 ```
-
-## Changelog
-
-Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
-
-## Contributing
-
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
-
-## Security Vulnerabilities
-
-Please review [our security policy](../../security/policy) on how to report security vulnerabilities.
-
-## Credits
-
-- [:author_name](https://github.com/:author_username)
-- [All Contributors](../../contributors)
 
 ## License
 
-The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
+MIT. See [LICENSE.md](LICENSE.md).
